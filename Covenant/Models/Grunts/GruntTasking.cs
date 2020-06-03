@@ -65,7 +65,8 @@ namespace Covenant.Models.Grunts
         Exit,
         Connect,
         Disconnect,
-        Jobs
+        Jobs,
+        WebDelivery
     }
 
     public class GruntTaskingMessage

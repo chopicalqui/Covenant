@@ -28,7 +28,9 @@ namespace Covenant.API.Models
         [EnumMember(Value = "Disconnect")]
         Disconnect,
         [EnumMember(Value = "Jobs")]
-        Jobs
+        Jobs,
+        [EnumMember(Value = "WebDelivery")]
+        WebDelivery
     }
     internal static class GruntTaskingTypeEnumExtension
     {
@@ -53,6 +55,8 @@ namespace Covenant.API.Models
                     return "Disconnect";
                 case GruntTaskingType.Jobs:
                     return "Jobs";
+                case GruntTaskingType.WebDelivery:
+                    return "WebDelivery";
             }
             return null;
         }
@@ -73,6 +77,8 @@ namespace Covenant.API.Models
                     return GruntTaskingType.Disconnect;
                 case "Jobs":
                     return GruntTaskingType.Jobs;
+                case "WebDelivery":
+                    return GruntTaskingType.WebDelivery;
             }
             return null;
         }
